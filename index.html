@@ -600,6 +600,7 @@ function criarPlanoVazio() {
     objetoConhecimentoPorHabilidade: {},
     metodologiaPorHabilidade: {},
     avaliacao: { rubricasPorHabilidade: {}, instrumentos: [], instrumentosOutros: '', referencias: '' },
+    registroAvaliacao: false,
     status: 'rascunho',
     etapaAtual: 1,
     criadoEm: new Date().toISOString(),
@@ -1117,6 +1118,148 @@ function gerarResumoSGNCompleto(plano) {
 }
 
 // ============================================================================
+// Registro de aula simplificado para dias de avaliação
+// ============================================================================
+function gerarRegistroAvaliacao(plano) {
+  const ident = plano.identificacao || {};
+  const habilidades = plano.habilidades || [];
+  const avaliacao = plano.avaliacao || {};
+  const linhas = [];
+
+  linhas.push('REGISTRO DE AULA — DIA DE AVALIAÇÃO');
+  linhas.push('');
+
+  if (ident.disciplina) linhas.push(`Disciplina: ${ident.disciplina}`);
+  if (ident.professor) linhas.push(`Professor(a): ${ident.professor}`);
+  if (ident.unidadeEducacional) linhas.push(`Unidade Educacional: ${ident.unidadeEducacional}`);
+  if (ident.anoSerie) linhas.push(`Ano/Série: ${ident.anoSerie}${ident.turma ? ` · Turma ${ident.turma}` : ''}`);
+  if (ident.dataAula) linhas.push(`Data: ${new Date(ident.dataAula + 'T00:00:00').toLocaleDateString('pt-BR')}`);
+  if (ident.minutosPorAula) linhas.push(`Tempo previsto: ${ident.numeroAulas || 1} aula(s) de ${ident.minutosPorAula} min`);
+  linhas.push('');
+
+  linhas.push('Habilidades e Competências Avaliadas');
+  habilidades.forEach((hab) => {
+    linhas.push(`• ${hab.codigo}${hab.competencia ? ` (${hab.competencia})` : ''}`);
+    linhas.push(`  ${hab.habilidade}`);
+  });
+  linhas.push('');
+
+  habilidades.forEach((hab) => {
+    const r = avaliacao.rubricasPorHabilidade?.[hab.codigo] || {};
+    linhas.push(`════════ ${hab.codigo} — Avaliação ════════`);
+    linhas.push('');
+
+    linhas.push('Objetivo de aprendizagem');
+    linhas.push(r.objetivoAprendizagem || '(não definido)');
+    linhas.push('');
+
+    linhas.push('Evidências de aprendizagem');
+    const evidencias = (r.evidenciasLista && r.evidenciasLista.length) ? r.evidenciasLista : (r.evidenciaAprendizagem ? [r.evidenciaAprendizagem] : ['(não definido)']);
+    evidencias.forEach((ev) => linhas.push(`• ${ev}`));
+    linhas.push('');
+
+    const instrumentos = [...(avaliacao.instrumentos || [])];
+    if (avaliacao.instrumentosOutros) instrumentos.push(avaliacao.instrumentosOutros);
+    if (instrumentos.length) {
+      linhas.push('Instrumento(s) de avaliação');
+      instrumentos.forEach((i) => linhas.push(`• ${i}`));
+      linhas.push('');
+    }
+
+    if (r.criterio1?.descricao || r.criterio2?.descricao) {
+      linhas.push('Critérios de avaliação');
+      if (r.criterio1?.descricao) linhas.push(`• ${r.criterio1.titulo ? r.criterio1.titulo + ': ' : ''}${r.criterio1.descricao}`);
+      if (r.criterio2?.descricao) linhas.push(`• ${r.criterio2.titulo ? r.criterio2.titulo + ': ' : ''}${r.criterio2.descricao}`);
+      linhas.push('');
+    }
+
+    if (r.conceitoA?.length || r.conceitoB?.length || r.conceitoC?.length) {
+      linhas.push('Conceitos');
+      (r.conceitoA || []).forEach((t) => linhas.push(`A — ${t}`));
+      (r.conceitoB || []).forEach((t) => linhas.push(`B — ${t}`));
+      (r.conceitoC || []).forEach((t) => linhas.push(`C — ${t}`));
+      linhas.push('');
+    }
+  });
+
+  if (avaliacao.referencias) {
+    linhas.push(`Referências: ${avaliacao.referencias}`);
+  }
+
+  return linhas.join('\n');
+}
+
+function gerarHTMLRegistroAvaliacao(plano) {
+  const ident = plano.identificacao || {};
+  const habilidades = plano.habilidades || [];
+  const avaliacao = plano.avaliacao || {};
+  const c = SESI_DOC_COLORS;
+
+  const infoItens = [
+    ['Disciplina', ident.disciplina],
+    ['Professor(a)', ident.professor],
+    ['Ano/Série', ident.anoSerie], ['Turma', ident.turma],
+    ['Unidade Educacional', ident.unidadeEducacional],
+    ['Data', ident.dataAula ? new Date(ident.dataAula + 'T00:00:00').toLocaleDateString('pt-BR') : ''],
+    ['Tempo previsto', ident.minutosPorAula ? `${ident.numeroAulas || 1} aula(s) de ${ident.minutosPorAula} min` : ''],
+  ].filter(([, v]) => !!v);
+
+  const infoHtml = infoItens.map(([label, valor]) => `
+    <tr>
+      <td style="padding:4px 10px 4px 0;color:${c.muted};font-size:12px;white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td>
+      <td style="padding:4px 0;color:${c.ink};font-size:12px;font-weight:600;">${escapeHtml(String(valor))}</td>
+    </tr>`).join('');
+
+  const habilidadesHtml = habilidades.map((hab, idx) => {
+    const r = avaliacao.rubricasPorHabilidade?.[hab.codigo] || {};
+    const evidencias = (r.evidenciasLista && r.evidenciasLista.length) ? r.evidenciasLista : (r.evidenciaAprendizagem ? [r.evidenciaAprendizagem] : []);
+    const instrumentos = [...(avaliacao.instrumentos || [])];
+    if (avaliacao.instrumentosOutros) instrumentos.push(avaliacao.instrumentosOutros);
+
+    const blocoSecao = (titulo, conteudo) => conteudo ? `
+      <h4 style="font-size:13px;color:${c.blue};margin:14px 0 4px;text-transform:uppercase;letter-spacing:.03em;">${escapeHtml(titulo)}</h4>
+      <div style="font-size:13px;color:${c.ink};white-space:pre-wrap;line-height:1.55;">${escapeHtml(conteudo)}</div>` : '';
+
+    return `
+      <div style="margin-top:${idx === 0 ? '10' : '28'}px;padding-top:${idx === 0 ? '0' : '18'}px;${idx > 0 ? `border-top:1px solid #DCE4ED;` : ''}">
+        <div style="display:inline-block;background:${c.blue};color:#fff;font-weight:700;font-size:11px;padding:3px 10px;border-radius:4px;font-family:'IBM Plex Mono',monospace;">${escapeHtml(hab.codigo)}</div>
+        ${hab.competencia ? `<span style="margin-left:8px;font-size:11.5px;color:${c.teal};font-weight:600;">${escapeHtml(hab.competencia)}</span>` : ''}
+        <p style="font-size:12.5px;color:${c.muted};margin:8px 0 0;font-style:italic;">${escapeHtml(hab.habilidade || '')}</p>
+        ${blocoSecao('Objetivo de aprendizagem', r.objetivoAprendizagem || '(não definido)')}
+        ${blocoSecao('Evidências de aprendizagem', evidencias.length ? evidencias.map((ev) => `• ${ev}`).join('\n') : '(não definido)')}
+        ${blocoSecao('Instrumento(s) de avaliação', instrumentos.length ? instrumentos.map((i) => `• ${i}`).join('\n') : '')}
+        ${blocoSecao('Critérios de avaliação', [r.criterio1?.descricao ? `${r.criterio1.titulo ? r.criterio1.titulo + ': ' : ''}${r.criterio1.descricao}` : '', r.criterio2?.descricao ? `${r.criterio2.titulo ? r.criterio2.titulo + ': ' : ''}${r.criterio2.descricao}` : ''].filter(Boolean).map((t) => `• ${t}`).join('\n'))}
+        ${blocoSecao('Conceitos', [...(r.conceitoA || []).map((t) => `A — ${t}`), ...(r.conceitoB || []).map((t) => `B — ${t}`), ...(r.conceitoC || []).map((t) => `C — ${t}`)].join('\n'))}
+      </div>`;
+  }).join('');
+
+  return `
+  <div style="font-family:'IBM Plex Sans',Arial,sans-serif;color:${c.ink};max-width:760px;margin:0 auto;">
+    <div style="display:flex;align-items:center;gap:10px;border-bottom:3px solid ${c.blue};padding-bottom:14px;margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:6px;background:${c.blue};border-radius:6px;padding:0 10px;height:34px;flex-shrink:0;">
+        <div style="display:flex;flex-direction:column;gap:2.5px;">
+          <span style="display:block;width:13px;height:2.5px;border-radius:1px;background:rgba(255,255,255,.85);"></span>
+          <span style="display:block;width:9px;height:2.5px;border-radius:1px;background:rgba(255,255,255,.85);"></span>
+          <span style="display:block;width:13px;height:2.5px;border-radius:1px;background:rgba(255,255,255,.85);"></span>
+        </div>
+        <span style="font-family:Georgia,'Times New Roman',serif;font-weight:700;font-style:italic;color:#fff;font-size:17px;">SESI</span>
+      </div>
+      <div style="font-weight:800;text-transform:uppercase;font-size:12px;line-height:1.2;letter-spacing:.01em;color:${c.ink};">Escola<br/>de Referência</div>
+      <div style="margin-left:8px;padding-left:10px;border-left:1px solid #DCE4ED;font-weight:500;font-size:12px;color:${c.muted};text-transform:uppercase;letter-spacing:.05em;">Registro de Aula — Avaliação</div>
+    </div>
+
+    <table style="border-collapse:collapse;margin-bottom:18px;">${infoHtml}</table>
+
+    <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:${c.teal};border-bottom:1px solid #DCE4ED;padding-bottom:6px;">Habilidades e Competências Avaliadas</h3>
+    ${habilidadesHtml || '<p style="color:#8C99A8;">Nenhuma habilidade registrada neste plano.</p>'}
+
+    ${avaliacao.referencias ? `<div style="margin-top:24px;padding-top:10px;border-top:1px solid #DCE4ED;font-size:12px;color:${c.ink};">Referências: ${escapeHtml(avaliacao.referencias)}</div>` : ''}
+
+    <div style="margin-top:28px;padding-top:12px;border-top:1px solid #DCE4ED;font-size:10.5px;color:#8C99A8;">Gerado pelo Planejamento de Aula — SESI Ensino Médio.</div>
+  </div>`;
+}
+
+// ============================================================================
 // Exportação — geração de documento completo do plano (PDF via impressão / Word)
 // ============================================================================
 const SESI_DOC_COLORS = { blue: '#0047B6', teal: '#03748C', green: '#31A636', red: '#CD372A', yellow: '#F2B817', cream: '#F9EED9', ink: '#1D1D1B', muted: '#54657A' };
@@ -1192,18 +1335,18 @@ function gerarHTMLCompletoPlano(plano) {
 }
 
 function exportarPlanoPDF(plano) {
-  const html = gerarHTMLCompletoPlano(plano);
+  const html = plano.registroAvaliacao ? gerarHTMLRegistroAvaliacao(plano) : gerarHTMLCompletoPlano(plano);
   const win = window.open('', '_blank');
   if (!win) { showToast('Não foi possível abrir a janela de impressão. Verifique o bloqueador de pop-ups.', 'info'); return; }
-  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Plano de Aula</title>
+  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${plano.registroAvaliacao ? 'Registro de Aula - Avaliação' : 'Plano de Aula'}</title>
     <style>@page{margin:22mm 18mm;} body{margin:0;padding:20px;}</style></head>
     <body>${html}<script>window.onload=()=>{window.print();};<\/script></body></html>`);
   win.document.close();
 }
 
 function exportarPlanoDocx(plano) {
-  const html = gerarHTMLCompletoPlano(plano);
-  const nomeArquivo = `plano-aula-${(plano.identificacao?.disciplina || 'sesi').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.doc`;
+  const html = plano.registroAvaliacao ? gerarHTMLRegistroAvaliacao(plano) : gerarHTMLCompletoPlano(plano);
+  const nomeArquivo = `${plano.registroAvaliacao ? 'registro-avaliacao' : 'plano-aula'}-${(plano.identificacao?.disciplina || 'sesi').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.doc`;
 
   // Documento HTML com marcações do Word (mso), abre nativamente no Microsoft Word.
   const docHtml = `<!DOCTYPE html>
@@ -2821,10 +2964,15 @@ function renderStep7(container) {
         <div class="page-header">
           <div class="page-header__eyebrow">Etapa 7 de 7</div>
           <h2>Exportação</h2>
-          <p class="page-header__desc">Copie o resumo formatado para colar no SGN (diário online).</p>
+          <p class="page-header__desc">Copie o resumo formatado para colar no SGN (diário online) ou exporte o documento do plano.</p>
         </div>
 
         ${ident.tempoTotalMinutos ? `<div class="alert alert-success">Tempo total de aplicação do plano: <strong>${formatarMinutos(ident.tempoTotalMinutos)}</strong> (${ident.numeroAulas} aula${ident.numeroAulas > 1 ? 's' : ''} de ${ident.minutosPorAula} min)</div>` : ''}
+
+        <label class="checkbox-field" style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--ink);margin-bottom:16px;">
+          <input type="checkbox" id="checkbox-registro-avaliacao" ${state.plano.registroAvaliacao ? 'checked' : ''} />
+          Este plano é um <strong>registro de aula para dia de avaliação</strong> (resumo e exportação focados na avaliação — sem metodologia)
+        </label>
 
         <div class="flex gap-8" style="flex-wrap:wrap;">
           <button class="btn btn-primary" id="btn-salvar-plano">Salvar plano</button>
@@ -2833,11 +2981,31 @@ function renderStep7(container) {
           <button class="btn btn-ai" id="btn-exportar-docx">Exportar Word</button>
         </div>
         <div class="section-divider"></div>
-        <h3 class="mb-8">Resumo para o SGN</h3>
-        <p class="text-sm text-muted mb-16">${mostrarDistribuicao ? 'A execução das habilidades foi distribuída ao longo das aulas do plano. Copie o bloco completo e cole no diário online (SGN).' : 'Copie o texto e cole no campo de descrição de aula do diário online (SGN).'}</p>
+        <h3 class="mb-8" id="titulo-resumo-sgn">Resumo para o SGN</h3>
+        <p class="text-sm text-muted mb-16" id="desc-resumo-sgn"></p>
         <div id="resumo-sgn-box"></div>
       </div>
     `));
+
+    const checkRegistro = container.querySelector('#checkbox-registro-avaliacao');
+    checkRegistro.addEventListener('change', () => {
+      state.plano.registroAvaliacao = checkRegistro.checked;
+      salvarPlanoAtual();
+      renderResumo();
+      atualizarLabelsExportacao();
+    });
+
+    function atualizarLabelsExportacao() {
+      const ehAvaliacao = checkRegistro.checked;
+      container.querySelector('#titulo-resumo-sgn').textContent = ehAvaliacao ? 'Registro para o SGN (dia de avaliação)' : 'Resumo para o SGN';
+      container.querySelector('#desc-resumo-sgn').textContent = ehAvaliacao
+        ? 'Registro simplificado focado na avaliação das habilidades/competências selecionadas. Copie o bloco e cole no diário online (SGN).'
+        : mostrarDistribuicao ? 'A execução das habilidades foi distribuída ao longo das aulas do plano. Copie o bloco completo e cole no diário online (SGN).' : 'Copie o texto e cole no campo de descrição de aula do diário online (SGN).';
+      const btnPdf = container.querySelector('#btn-exportar-pdf');
+      const btnDocx = container.querySelector('#btn-exportar-docx');
+      if (btnPdf) btnPdf.textContent = ehAvaliacao ? 'Exportar PDF (avaliação)' : 'Exportar PDF';
+      if (btnDocx) btnDocx.textContent = ehAvaliacao ? 'Exportar Word (avaliação)' : 'Exportar Word';
+    }
 
     container.querySelector('#btn-marcar-finalizado').addEventListener('click', () => {
       state.plano.status = 'finalizado';
@@ -2862,35 +3030,46 @@ function renderStep7(container) {
     });
 
     const box = container.querySelector('#resumo-sgn-box');
-    if (!habilidades.length) {
-      box.innerHTML = '<div class="empty-state">Nenhuma habilidade no plano.</div>';
-      return;
+
+    function renderResumo() {
+      if (!habilidades.length) {
+        box.innerHTML = '<div class="empty-state">Nenhuma habilidade no plano.</div>';
+        return;
+      }
+      const ehAvaliacao = checkRegistro.checked;
+      const chipsDistribuicao = (!ehAvaliacao && mostrarDistribuicao) ? `
+        <div class="chip-row" style="margin-bottom:12px;">
+          ${distribuicoes.map((d) => `<span class="chip" style="cursor:default;">${escapeHtml(formatarRotuloDistribuicao(d, true))} · ${escapeHtml(d.hab.codigo)}</span>`).join('')}
+        </div>` : '';
+
+      const resumoCompleto = ehAvaliacao
+        ? gerarRegistroAvaliacao(state.plano)
+        : gerarResumoSGNCompleto(state.plano);
+
+      const labelCopiar = ehAvaliacao ? 'Copiar registro de avaliação' : 'Copiar resumo completo';
+      box.innerHTML = '';
+      box.appendChild(el(`
+        <div>
+          ${chipsDistribuicao}
+          <textarea class="textarea" id="texto-resumo-sgn" rows="22" readonly style="font-family:var(--font-mono);font-size:.78rem;">${escapeHtml(resumoCompleto)}</textarea>
+          <button class="btn btn-secondary mt-8" id="btn-copiar-resumo">${labelCopiar}</button>
+        </div>
+      `));
+
+      box.querySelector('#btn-copiar-resumo').addEventListener('click', async () => {
+        const texto = box.querySelector('#texto-resumo-sgn').value;
+        try {
+          await navigator.clipboard.writeText(texto);
+          showToast(labelCopiar.replace('Copiar ', '') + ' copiado para a área de transferência.', 'success');
+        } catch {
+          box.querySelector('#texto-resumo-sgn').select();
+          showToast('Selecione e copie manualmente (Ctrl/Cmd+C).', 'info');
+        }
+      });
     }
 
-    const chipsDistribuicao = mostrarDistribuicao ? `
-      <div class="chip-row" style="margin-bottom:12px;">
-        ${distribuicoes.map((d) => `<span class="chip" style="cursor:default;">${escapeHtml(formatarRotuloDistribuicao(d, true))} · ${escapeHtml(d.hab.codigo)}</span>`).join('')}
-      </div>` : '';
-
-    const resumoCompleto = gerarResumoSGNCompleto(state.plano);
-    box.appendChild(el(`
-      <div>
-        ${chipsDistribuicao}
-        <textarea class="textarea" id="texto-resumo-sgn" rows="22" readonly style="font-family:var(--font-mono);font-size:.78rem;">${escapeHtml(resumoCompleto)}</textarea>
-        <button class="btn btn-secondary mt-8" id="btn-copiar-resumo">Copiar resumo completo</button>
-      </div>
-    `));
-
-    box.querySelector('#btn-copiar-resumo').addEventListener('click', async () => {
-      const texto = box.querySelector('#texto-resumo-sgn').value;
-      try {
-        await navigator.clipboard.writeText(texto);
-        showToast('Resumo copiado para a área de transferência.', 'success');
-      } catch {
-        box.querySelector('#texto-resumo-sgn').select();
-        showToast('Selecione e copie manualmente (Ctrl/Cmd+C).', 'info');
-      }
-    });
+    renderResumo();
+    atualizarLabelsExportacao();
   }
 
   render();
