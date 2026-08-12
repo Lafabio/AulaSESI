@@ -1334,11 +1334,21 @@ function gerarHTMLCompletoPlano(plano) {
   </div>`;
 }
 
+function rotuloPeriodoPlano(plano) {
+  const ident = plano.identificacao || {};
+  if (!ident.dataAula) return '';
+  const inicio = segundaDaSemana(new Date(ident.dataAula + 'T00:00:00'));
+  const fim = sextaDaSemana(inicio);
+  const f = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return `${f(inicio)} a ${f(fim)}`;
+}
+
 function exportarPlanoPDF(plano) {
   const html = plano.registroAvaliacao ? gerarHTMLRegistroAvaliacao(plano) : gerarHTMLCompletoPlano(plano);
+  const titulo = `${plano.registroAvaliacao ? 'Registro de avaliação' : 'Plano semanal'} ${rotuloPeriodoPlano(plano) || ''}`.trim();
   const win = window.open('', '_blank');
   if (!win) { showToast('Não foi possível abrir a janela de impressão. Verifique o bloqueador de pop-ups.', 'info'); return; }
-  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${plano.registroAvaliacao ? 'Registro de Aula - Avaliação' : 'Plano de Aula'}</title>
+  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${escapeHtml(titulo)}</title>
     <style>@page{margin:22mm 18mm;} body{margin:0;padding:20px;}</style></head>
     <body>${html}<script>window.onload=()=>{window.print();};<\/script></body></html>`);
   win.document.close();
@@ -1346,7 +1356,8 @@ function exportarPlanoPDF(plano) {
 
 function exportarPlanoDocx(plano) {
   const html = plano.registroAvaliacao ? gerarHTMLRegistroAvaliacao(plano) : gerarHTMLCompletoPlano(plano);
-  const nomeArquivo = `${plano.registroAvaliacao ? 'registro-avaliacao' : 'plano-aula'}-${(plano.identificacao?.disciplina || 'sesi').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.doc`;
+  const periodo = rotuloPeriodoPlano(plano).replace(/\//g, '-');
+  const nomeArquivo = `${plano.registroAvaliacao ? 'Registro de avaliação' : 'Plano semanal'}${periodo ? ` ${periodo}` : ''}.doc`;
 
   // Documento HTML com marcações do Word (mso), abre nativamente no Microsoft Word.
   const docHtml = `<!DOCTYPE html>
