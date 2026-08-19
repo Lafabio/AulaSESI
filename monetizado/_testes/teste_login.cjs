@@ -21,6 +21,9 @@ setTimeout(() => {
   check('aba criar conta presente', html.indexOf('form-cadastrar') !== -1);
   check('aviso de modo desenvolvimento', html.indexOf('Modo desenvolvimento') !== -1);
   check('créditos de cortesia citados', html.indexOf('créditos de cortesia') !== -1);
+  check('link esqueci minha senha', html.indexOf('btn-esqueci-senha') !== -1);
+  check('mostrar senha no login', html.indexOf('btn-mostrar-login-senha') !== -1);
+  check('mostrar senha no cadastro', html.indexOf('btn-mostrar-cad-senha') !== -1);
   console.log('\n' + (fails === 0 ? 'LOGIN OK' : fails + ' FALHAS'));
   process.exit(fails === 0 ? 0 : 1);
 }, 500);

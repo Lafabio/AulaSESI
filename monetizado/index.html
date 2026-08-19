@@ -234,7 +234,7 @@ const CREDITO_GRATIS_INICIAL = 15;  // créditos de boas-vindas no cadastro
 const AI_CUSTO_POR_CHAMADA = 1;     // créditos consumidos por chamada de IA
 // ============================================================================
 
-const supabaseInst = (SUPABASE_URL.indexOf('https') === 0 && (SUPABASE_ANON_KEY.indexOf('ey') === 0 || SUPABASE_ANON_KEY.indexOf('sb_') === 0))
+const supabaseInst = (window.supabase && window.supabase.createClient && SUPABASE_URL.indexOf('https') === 0 && (SUPABASE_ANON_KEY.indexOf('ey') === 0 || SUPABASE_ANON_KEY.indexOf('sb_') === 0))
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
@@ -330,7 +330,9 @@ function renderLoginAuth() {
             <div class="field"><label for="login-email">E-mail</label>
               <input class="input" id="login-email" type="email" required placeholder="voce@escola.com.br" autocomplete="email" /></div>
             <div class="field"><label for="login-senha">Senha</label>
-              <input class="input" id="login-senha" type="password" required placeholder="••••••••" autocomplete="current-password" /></div>
+              <div style="display:flex;gap:6px;"><input class="input" id="login-senha" type="password" required placeholder="••••••••" autocomplete="current-password" style="flex:1;" />
+              <button type="button" id="btn-mostrar-login-senha" class="btn btn-secondary" style="width:42px;font-size:.8rem;padding:0;" title="Mostrar/ocultar senha">👁</button></div></div>
+            <div style="text-align:right;margin:-6px 0 12px;"><a href="#" id="btn-esqueci-senha" style="font-size:.78rem;">Esqueci minha senha</a></div>
             <button class="btn btn-primary btn-block" type="submit">Entrar</button>
             <p class="text-faint text-sm mt-16" style="text-align:center;">Seus planos ficam salvos por conta (nuvem).</p>
           </form>
@@ -340,7 +342,8 @@ function renderLoginAuth() {
             <div class="field"><label for="cad-email">E-mail</label>
               <input class="input" id="cad-email" type="email" required placeholder="voce@escola.com.br" autocomplete="email" /></div>
             <div class="field"><label for="cad-senha">Senha (mín. 6 caracteres)</label>
-              <input class="input" id="cad-senha" type="password" required minlength="6" autocomplete="new-password" /></div>
+              <div style="display:flex;gap:6px;"><input class="input" id="cad-senha" type="password" required minlength="6" autocomplete="new-password" style="flex:1;" />
+              <button type="button" id="btn-mostrar-cad-senha" class="btn btn-secondary" style="width:42px;font-size:.8rem;padding:0;" title="Mostrar/ocultar senha">👁</button></div></div>
             <p class="field__hint">Ao criar a conta você ganha ${CREDITO_GRATIS_INICIAL} créditos de cortesia para testar a IA.</p>
             <button class="btn btn-primary btn-block" type="submit">Criar conta grátis</button>
           </form>
@@ -365,6 +368,27 @@ function renderLoginAuth() {
 
   document.getElementById('form-entrar').addEventListener('submit', entrarComEmail);
   document.getElementById('form-cadastrar').addEventListener('submit', cadastrarComEmail);
+
+  // Mostrar/ocultar senha
+  [['login-senha', 'btn-mostrar-login-senha'], ['cad-senha', 'btn-mostrar-cad-senha']].forEach(([inpId, btnId]) => {
+    const inp = document.getElementById(inpId);
+    const btn = document.getElementById(btnId);
+    if (inp && btn) btn.addEventListener('click', () => {
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+    });
+  });
+
+  // Esqueci minha senha
+  document.getElementById('btn-esqueci-senha').addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (!supabasePronto()) return showToast('Configure o Supabase antes de continuar.', 'error');
+    const email = document.getElementById('login-email').value.trim();
+    if (!email) return showToast('Informe seu e-mail para recuperar a senha.', 'error');
+    const { error } = await supabaseInst.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+    if (error) return showToast('Não foi possível enviar: ' + error.message, 'error');
+    showToast('E-mail de recuperação enviado! Verifique sua caixa de entrada.', 'success');
+  });
 }
 
 async function entrarComEmail(e) {
