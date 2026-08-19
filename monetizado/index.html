@@ -221,8 +221,8 @@ window.GROQ_MODELOS_DEPRECADOS = ['llama-3.3-70b-versatile','llama-3.3-70b-specd
 // no SQL Editor do seu projeto ANTES de publicar.
 // ============================================================================
 // >>> PASSO 1: preencha com os dados do SEU projeto Supabase (Settings > API)
-const SUPABASE_URL = 'COLE_SUA_URL_DO_SUPABASE';   // ex: https://xxxx.supabase.co
-const SUPABASE_ANON_KEY = 'COLE_SUA_CHAVE_ANON';   // começa com "eyJ..."
+const SUPABASE_URL = 'https://srrrwkdxlcyldsnbcwuu.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_xULDqHpl6P4btqRGsnkLTw_Lodq7Qhh';
 // >>> PASSO 2: dados do seu PIX para recebimento manual
 const PIX_CONFIG = {
   chave: 'COLE_SUA_CHAVE_PIX',
@@ -234,7 +234,7 @@ const CREDITO_GRATIS_INICIAL = 15;  // créditos de boas-vindas no cadastro
 const AI_CUSTO_POR_CHAMADA = 1;     // créditos consumidos por chamada de IA
 // ============================================================================
 
-const supabaseInst = (SUPABASE_URL.indexOf('https') === 0 && SUPABASE_ANON_KEY.indexOf('ey') === 0)
+const supabaseInst = (SUPABASE_URL.indexOf('https') === 0 && (SUPABASE_ANON_KEY.indexOf('ey') === 0 || SUPABASE_ANON_KEY.indexOf('sb_') === 0))
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
