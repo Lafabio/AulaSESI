@@ -935,7 +935,7 @@ Responda SOMENTE com um objeto JSON válido no formato exato:
   "conceito_c": ["detalha o não atendimento dos 2 critérios, com as lacunas observáveis, citando o conteúdo"]
 }`;
   const user = `Habilidade: "${habilidade}"\nObjetivo de aprendizagem: ${objetivoAprendizagem || 'não informado'}\nProcesso cognitivo: ${processoCognitivo || 'não informado'}\nConteúdos: ${(conteudos || []).join('; ') || 'não informado'}\n\nGere a evidência (texto e lista), as estratégias, 2 critérios detalhando o que é esperado em cada um e os conceitos A/B/C detalhando o esperado em cada critério, sempre citando o conteúdo da aula.`;
-  return callGroqJSON({ system, user, temperature: 0.4, maxTokens: 1300 });
+  return callGroqJSON({ system, user, temperature: 0.4, maxTokens: 3000 });
 }
 
 // ---------------------------------------------------------------------------
